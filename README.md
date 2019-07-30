@@ -36,3 +36,5 @@ svg 渲染虽然没有这个限制，但是渲染的速度很难接受
 ![](https://github.com/QCCS/windowing-technique-echart/blob/master/2.png)
 
 用的是原生 js ，看看原理，可以很方便移植到 react 或者 vue 项目。
+
+wechat: qianchaochushui
