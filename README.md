@@ -1,6 +1,8 @@
 # windowing-technique-echart
 给 echart 加上窗口化技术
 
+[预览地址](https://qccs.github.io/windowing-technique-echart/)
+
 ## 问题
 做项目的时候，渲染柱形图，后端返回大约 5000 数据，
 
