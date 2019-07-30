@@ -196,6 +196,7 @@
     * 设置滚动条的样式
     * */
     function setVScrollStyle(scrollTop, pageSize, total, vScrollWrap, vScroll) {
+        vScrollWrap.style.display = 'block';
         //滚动条高度
         let sHeight = vScrollHeight(vScrollWrap, pageSize, total);
         vScroll.style.height = sHeight + "px";
@@ -204,6 +205,9 @@
         let sTop = vScrollTop(_vScrollCanTop, scrollTop, _mouseMoveAllHeight);
         windowScroll.innerHTML = sTop;
         vScroll.style.top = sTop + 'px';
+        if(sHeight === vScrollWrap.offsetHeight){
+            vScrollWrap.style.display = 'none';
+        }
     }
     /*
     * 深拷贝
