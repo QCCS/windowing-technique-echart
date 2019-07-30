@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="https://cdn.bootcss.com/echarts/4.2.1/echarts.min.js"></script>
+    <style>
+        #demoWrap {
+            width: 640px;
+            height: 460px;
+            padding: 10px;
+            border: solid 1px gainsboro;
+            float: left;
+        }
+
+        #mainWrap {
+            width: 620px;
+            height: 460px;
+            overflow: auto;
+            float: left;
+
+        }
+
+        #test {
+            float: left;
+            margin-left: 4px;
+        }
+
+        #vScrollWrap {
+            position: relative;
+            width: 10px;
+            height: 460px;
+            background: #fafafa;
+        }
+
+        #vScrollWrap #vScroll {
+            position: absolute;
+            height: 10px;
+            width: 10px;
+            background: #c2c2c2;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        #vScrollWrap #vScroll #hand {
+            width: 100%;
+            min-height: 10px;
+            background: #c2c2c2;
+        }
+
+        .form {
+            clear: both;
+        }
+
+        #showContainer {
+            float: left;
+            background: darkgrey;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+<!-- 为 ECharts 准备一个具备大小（宽高）的 DOM -->
+<!--canvas height 超过 10000 之后卡顿或者直接无法渲染-->
+<div id="demoWrap">
+    <div id="mainWrap">
+        <div id="main" style="width: 620px;height:460px;"></div>
+    </div>
+    <div id="test">
+        <div id="vScrollWrap">
+            <div id="vScroll">
+                <!--主要是方便鼠标抓取-->
+                <div id="hand"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="showContainer">
+    <div>
+        鼠标滚动距离
+        <div id="showScroll"></div>
+    </div>
+    <hr/>
+    <div>
+        滚动条拉动距离
+        <div id="windowScroll"></div>
+    </div>
+</div>
+<div class="form">
+    <span>数据数量</span>
+    <input id="inp" value="100">
+    <input type="button" value="确定" id="btn">
+</div>
+
+</body>
+</html>
+<script>
+
+    //生成模拟初始化数据
+    function initData(options, itemNumbers) {
+        //初始化数据
+        let arr = getArr(itemNumbers);
+        options.yAxis[0].data = arr.map(item => {
+            return item.label;
+        });
+        options.series[0].data = arr.map(item => {
+            return item.value;
+        });
+        return options;
+    }
+    //模拟数据
+    function getArr(len) {
+        let arr = [];
+        for (let i = 0; i < len; i++) {
+            arr.push({
+                label: '姓名' + i,
+                value: i * 2
+            });
+        }
+        return arr;
+    }
+
+    /*
+    * 计算滚动条的长度
+    * 公式 (vScrollWrapHeight * pageSize) / total
+    * @params vScrollWrap 容器 DOM 对象
+    * @params pageSize 每页大小
+    * @params total 总的数据条数
+    * */
+    function vScrollHeight(vScrollWrap, pageSize, total) {
+        let height = vScrollWrap.offsetHeight * pageSize / total;
+        if (height >= vScrollWrap.offsetHeight) {
+            height = vScrollWrap.offsetHeight;
+        }
+        return height;
+    }
+
+    /*
+    * 计算滚动条可以被滑动的长度
+    * @params vScrollWrap 容器 DOM 对象
+    * @params vScrollHeight 滚动条的长度
+    * */
+    function vScrollCanTop(vScrollWrap, vScrollHeight) {
+        return vScrollWrap.offsetHeight - vScrollHeight;
+    }
+
+    /*
+    * 滚动条滚动的高度
+    * 公式 滚动条滚动的高度/可以被滚动条滚动的长度 === 鼠标已经滚动距离/鼠标可以滚动总的距离
+    * @params vScrollCanTop 可以被滚动条滚动的长度
+    * @params mouseHasScroll 鼠标已经滚动距离
+    * @params mouseMoveAllHeight 鼠标可以滚动总的距离
+    * */
+    function vScrollTop(vScrollCanTop, mouseHasScroll, mouseMoveAllHeight) {
+        if (mouseMoveAllHeight === 0) {
+            return 0;
+        }
+        let vScrollHeight = vScrollCanTop * mouseHasScroll / mouseMoveAllHeight;
+        if (vScrollHeight >= vScrollCanTop) {
+            vScrollHeight = vScrollCanTop;
+        }
+        return parseInt(vScrollHeight);
+    }
+
+    /*
+    * 鼠标滚动的高度
+    * 公式 滚动条滚动的高度/可以被滚动条滚动的长度 === 鼠标已经滚动距离/鼠标可以滚动总的距离
+    * @params vScrollHeight 滚动条滚动的高度
+    * @params vScrollCanTop 可以被滚动条滚动的长度
+    * @params mouseMoveAllHeight 鼠标可以滚动总的距离
+    * */
+    function mouseMoveTop(vScrollHeight, vScrollCanTop, mouseMoveAllHeight) {
+        if (vScrollCanTop === 0) {
+            return 0;
+        }
+        let mouseHasScroll = vScrollHeight * mouseMoveAllHeight / vScrollCanTop;
+        if (mouseHasScroll >= mouseMoveAllHeight) {
+            mouseHasScroll = mouseMoveAllHeight;
+        }
+        return parseInt(mouseHasScroll);
+    }
+    /*
+    * 鼠标可以滚动的总距离
+    * 鼠标滚动一下，距离加1
+    * @params pageSize 每页大小
+    * @params total 总的数据条数
+    * */
+    function mouseMoveAllHeight(total, pageSize) {
+        let all = total - pageSize;
+        if (all <= 0) {
+            all = 0;
+        }
+        return all;
+    }
+    /*
+    * 设置滚动条的样式
+    * */
+    function setVScrollStyle(scrollTop, pageSize, total, vScrollWrap, vScroll) {
+        //滚动条高度
+        let sHeight = vScrollHeight(vScrollWrap, pageSize, total);
+        vScroll.style.height = sHeight + "px";
+        let _vScrollCanTop = vScrollCanTop(vScrollWrap, sHeight);
+        let _mouseMoveAllHeight = mouseMoveAllHeight(total, pageSize);
+        let sTop = vScrollTop(_vScrollCanTop, scrollTop, _mouseMoveAllHeight);
+        windowScroll.innerHTML = sTop;
+        vScroll.style.top = sTop + 'px';
+    }
+    /*
+    * 深拷贝
+    * */
+    function deepFullCopy(obj) {
+        return JSON.parse(JSON.stringify(obj));
+    }
+    /*
+    * 获取当前画布的参数 柱形图
+    * @params option echart 配置的参数 option
+    * @params startIndex 渲染的起始数据序号
+    * @params pageSize 每页数据量
+    * */
+    function getCurrentRenderOptions(option, startIndex, pageSize) {
+        let start = startIndex;
+        let options = deepFullCopy(option);
+        let len = options.yAxis[0].data.length;
+        if (start + pageSize >= len) {
+            start = len - pageSize
+        }
+        options.yAxis[0].data = options.yAxis[0].data.filter((item, index) => {
+            return (index >= start && index < start + pageSize);
+        });
+        options.series[0].data = options.series[0].data.filter((item, index) => {
+            return (index >= start && index < start + pageSize);
+        });
+        options.yAxis[0].data.reverse();
+        options.series[0].data.reverse();
+        return options;
+    }
+
+    /*
+    * 闭包存储鼠标滚动距离
+    * */
+    function wrapGetVScrollTop() {
+        let top = 0;
+        return getVScrollTop;
+        /*
+        * 获取滚动距离，使用闭包保留滚动的值
+        * @direct 滚动方向
+        * @total 数据最大量
+        * @pageSize 一个图表当前渲染的数量
+        * @value 设置鼠标滚动的距离
+        * @return 滚动距离
+        * */
+        function getVScrollTop(direct, total, pageSize, value) {
+            if (!value) {
+                if (direct < 0) {
+                    top++;
+                } else {
+                    top--;
+                }
+                if (top >= (total - pageSize)) {
+                    top = (total - pageSize);
+                }
+                if (top <= 0) {
+                    top = 0;
+                }
+            } else {
+                if (value) {
+                    top = value;
+                }
+            }
+            showScroll.innerHTML = top;
+            return top;
+        }
+    }
+
+    let mouseHasScroll = wrapGetVScrollTop();
+    //虚拟滚动
+    let vScrollWrap = document.getElementById("vScrollWrap");
+    let vScroll = document.getElementById("vScroll");
+    //参数配置
+    let option = {
+        title: {
+            text: '人员图表',
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                type: 'shadow'
+            }
+        },
+        grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            containLabel: true
+        },
+        xAxis: {
+            type: 'value',
+            boundaryGap: [0, 0.01]
+        },
+        yAxis: [
+            {
+                type: 'category',
+                data: ['巴西', '印尼', '美国', '印度']
+            }
+        ],
+        series: [
+            {
+                name: '2011年',
+                type: 'bar',
+                data: [18203, 23489, 29034, 104970]
+            },
+        ]
+    };
+    // 基于准备好的 dom，初始化 echarts 实例
+    let myChart = echarts.init(document.getElementById('main'), null, {
+        renderer: 'canvas'
+    });
+    //获取第一次渲染数据
+    option = initData(option, 600);
+    //所有数据个个数
+    let total = option.yAxis[0].data.length;
+    //每个canvas显示条目
+    let pageSize = 10;
+    //添加滚动事件
+    let mainWrap = document.getElementById("mainWrap");
+    // chrome
+    mainWrap.addEventListener('mousewheel', onmousewheelhandler, true);
+    // 火狐
+    mainWrap.addEventListener('DOMMouseScroll', onmousewheelhandler, true);
+    //div 模拟滚轮
+    vScrollWrap.addEventListener('mousedown', mousedownHandler, true);
+
+    renderFirst(myChart);
+    //渲染第一次的数据
+    function renderFirst(myChart) {
+        //设置滚动条高度
+        setVScrollStyle(0, pageSize, total, vScrollWrap, vScroll);
+        let options = getCurrentRenderOptions(option, 0, pageSize);
+        myChart.setOption(options);
+    }
+    /*
+    * 鼠标滚动处理器
+    * */
+    function onmousewheelhandler(e) {
+        let ev = e || window.event;
+        ev.preventDefault();
+        //兼容 Firefox
+        ev.returnValue = false;
+        let delta = (e.wheelDelta && (e.wheelDelta > 0 ? 1 : -1)) || (e.detail && (e.detail > 0 ? -1 : 1));
+        /*
+        if (delta > 0) {
+            console.log('向上滚');
+        } else if (delta < 0) {
+            console.log('向下滚');
+        }
+        * */
+        let start = mouseHasScroll(delta, total, pageSize);
+        setVScrollStyle(start, pageSize, total, vScrollWrap, vScroll);
+        let options = getCurrentRenderOptions(option, start, pageSize);
+        // 使用刚指定的配置项和数据显示图表。
+        myChart.setOption(options);
+    }
+    /*
+    * 添加事件 鼠标拖拽滚动条
+    * */
+    function mousedownHandler() {
+        document.addEventListener('mousemove', mousemoveHandler, true);
+        document.addEventListener('mouseup', mouseupHandler, true);
+    }
+    /*
+    * 鼠标拖拽处理器
+    * */
+    function mousemoveHandler(ev) {
+        let top = ev.clientY;
+        if (top <= 0) {
+            top = 0;
+        }
+        let sHeight = vScrollHeight(vScrollWrap, pageSize, total);
+        let _vScrollCanTop = vScrollCanTop(vScrollWrap, sHeight);
+        let _mouseMoveAllHeight = mouseMoveAllHeight(total, pageSize);
+        let _mouseMoveTop = mouseMoveTop(top, _vScrollCanTop, _mouseMoveAllHeight);
+        mouseHasScroll(0, 0, 0, _mouseMoveTop);
+        setVScrollStyle(_mouseMoveTop, pageSize, total, vScrollWrap, vScroll);
+        let options = getCurrentRenderOptions(option, _mouseMoveTop, pageSize);
+        // 使用刚指定的配置项和数据显示图表。
+        myChart.setOption(options);
+    }
+    /*
+    * 添加事件 鼠标弹起
+    * */
+    function mouseupHandler() {
+        document.removeEventListener('mouseup', mouseupHandler, true);
+        document.removeEventListener('mousemove', mousemoveHandler, true);
+    }
+    //测试数据
+    btn.onclick = function () {
+        let num = parseInt(inp.value);
+        option = initData(option, num);
+        total = option.yAxis[0].data.length;
+        page = (total / pageSize) > 1 ? (total / pageSize) : 0;
+        renderFirst(myChart);
+    }
+</script>
