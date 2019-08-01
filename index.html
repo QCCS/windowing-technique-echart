@@ -57,9 +57,13 @@
             background: darkgrey;
             padding: 10px;
         }
+        #test1{
+            height: 1000px;
+        }
     </style>
 </head>
 <body>
+<div id="test1"></div>
 <!-- 为 ECharts 准备一个具备大小（宽高）的 DOM -->
 <!--canvas height 超过 10000 之后卡顿或者直接无法渲染-->
 <div id="demoWrap">
@@ -118,6 +122,12 @@
             });
         }
         return arr;
+    }
+    /*
+    * 深拷贝
+    * */
+    function deepFullCopy(obj) {
+        return JSON.parse(JSON.stringify(obj));
     }
 
     /*
@@ -209,12 +219,7 @@
             vScrollWrap.style.display = 'none';
         }
     }
-    /*
-    * 深拷贝
-    * */
-    function deepFullCopy(obj) {
-        return JSON.parse(JSON.stringify(obj));
-    }
+
     /*
     * 获取当前画布的参数 柱形图
     * @params option echart 配置的参数 option
@@ -325,6 +330,8 @@
     let total = option.yAxis[0].data.length;
     //每个canvas显示条目
     let pageSize = 10;
+    let y = 0;
+    let t = 0;
     //添加滚动事件
     let mainWrap = document.getElementById("mainWrap");
     // chrome
@@ -367,7 +374,9 @@
     /*
     * 添加事件 鼠标拖拽滚动条
     * */
-    function mousedownHandler() {
+    function mousedownHandler(ev) {
+        y = ev.clientY;
+        t = vScroll.offsetTop;
         document.addEventListener('mousemove', mousemoveHandler, true);
         document.addEventListener('mouseup', mouseupHandler, true);
     }
@@ -376,6 +385,10 @@
     * */
     function mousemoveHandler(ev) {
         let top = ev.clientY;
+        console.log(top)
+        console.log(y)
+        console.log(t)
+        top = top - y + t;
         if (top <= 0) {
             top = 0;
         }
